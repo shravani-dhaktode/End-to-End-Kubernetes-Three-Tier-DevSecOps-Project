@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
 
-module.exports = async () => {
+// Connects to MongoDB. If the database is not ready yet (common right after
+// deploying to Kubernetes), it waits 5 seconds and tries again, forever.
+const connect = async () => {
     try {
         const connectionParams = {
             useNewUrlParser: true,
@@ -17,6 +19,9 @@ module.exports = async () => {
         );
         console.log("Connected to database.");
     } catch (error) {
-        console.log("Could not connect to database.", error);
+        console.log("Could not connect to database. Retrying in 5 seconds...", error.message);
+        setTimeout(connect, 5000);
     }
 };
+
+module.exports = connect;

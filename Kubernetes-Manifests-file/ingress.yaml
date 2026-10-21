@@ -11,8 +11,8 @@ metadata:
 spec:
   ingressClassName: alb
   rules:
-    - host: amanpathakdevops.study
-      http:
+    # No domain: open the app using the load balancer address (ADDRESS column of: kubectl get ingress -n three-tier)
+    - http:
         paths:
           - path: /api
             pathType: Prefix

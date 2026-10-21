@@ -1,16 +1,13 @@
+# Terraform settings.
+# We use LOCAL state (no S3 bucket / DynamoDB table needed).
+# The state file (terraform.tfstate) is saved in this folder in AWS CloudShell.
+# DO NOT delete this folder until you have run "terraform destroy".
 terraform {
-  backend "s3" {
-    bucket         = "my-ews-baket1"
-    region         = "us-east-1"
-    key            = "End-to-End-Kubernetes-Three-Tier-DevSecOps-Project/Jenkins-Server-TF/terraform.tfstate"
-    dynamodb_table = "Lock-Files"
-    encrypt        = true
-  }
-  required_version = ">=0.13.0"
+  required_version = ">= 1.3.0"
   required_providers {
     aws = {
-      version = ">= 2.7.0"
       source  = "hashicorp/aws"
+      version = "~> 5.0"
     }
   }
 }

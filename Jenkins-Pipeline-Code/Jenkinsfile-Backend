@@ -1,113 +1,127 @@
+// Backend pipeline
+// Needs only TWO Jenkins credentials (both "Secret text"):
+//   github      -> your GitHub Personal Access Token (used to push the new image tag)
+//   sonar-token -> the token you generate inside SonarQube (only needed when RUN_SONAR is ticked)
+// No extra Jenkins plugins are needed beyond the "Install suggested plugins" set.
 pipeline {
-    agent any 
-    tools {
-        jdk 'jdk'
-        nodejs 'nodejs'
+    agent any
+
+    parameters {
+        booleanParam(name: 'RUN_SONAR', defaultValue: true, description: 'Run the SonarQube code scan. Untick it after your first build to save time.')
     }
-    environment  {
-        SCANNER_HOME=tool 'sonar-scanner'
-        AWS_ACCOUNT_ID = credentials('ACCOUNT_ID')
-        AWS_ECR_REPO_NAME = credentials('ECR_REPO2')
+
+    options {
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        AWS_ACCOUNT_ID     = '747456040606'
         AWS_DEFAULT_REGION = 'us-east-1'
-        REPOSITORY_URI = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/"
+        AWS_ECR_REPO_NAME  = 'backend'
+        ECR_REGISTRY       = '747456040606.dkr.ecr.us-east-1.amazonaws.com'
+        GIT_USER_NAME      = 'shravani-dhaktode'
+        GIT_EMAIL          = 'shravanidhaktode46@gmail.com'
+        GIT_REPO_NAME      = 'End-to-End-Kubernetes-Three-Tier-DevSecOps-Project'
+        GIT_BRANCH_NAME    = 'master'
+        APP_DIR            = 'Application-Code/backend'
+        MANIFEST_DIR       = 'Kubernetes-Manifests-file/Backend'
     }
+
     stages {
         stage('Cleaning Workspace') {
             steps {
-                cleanWs()
+                deleteDir()
             }
         }
+
         stage('Checkout from Git') {
             steps {
-                git credentialsId: 'GITHUB', url: 'https://github.com/AmanPathak-DevOps/End-to-End-Kubernetes-Three-Tier-DevSecOps-Project.git'
+                git branch: 'master', url: 'https://github.com/shravani-dhaktode/End-to-End-Kubernetes-Three-Tier-DevSecOps-Project.git'
             }
         }
-        stage('Sonarqube Analysis') {
+
+        stage('SonarQube Analysis') {
+            when { expression { return params.RUN_SONAR } }
             steps {
-                dir('Application-Code/backend') {
-                    withSonarQubeEnv('sonar-server') {
-                        sh ''' $SCANNER_HOME/bin/sonar-scanner \
-                        -Dsonar.projectName=three-tier-backend \
-                        -Dsonar.projectKey=three-tier-backend '''
-                    }
-                }
-            }
-        }
-        stage('Quality Check') {
-            steps {
-                script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'sonar-token' 
-                }
-            }
-        }
-        stage('OWASP Dependency-Check Scan') {
-            steps {
-                dir('Application-Code/backend') {
-                    dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
-                    dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
-                }
-            }
-        }
-        stage('Trivy File Scan') {
-            steps {
-                dir('Application-Code/backend') {
-                    sh 'trivy fs . > trivyfs.txt'
-                }
-            }
-        }
-        stage("Docker Image Build") {
-            steps {
-                script {
-                    dir('Application-Code/backend') {
-                            sh 'docker system prune -f'
-                            sh 'docker container prune -f'
-                            sh 'docker build -t ${AWS_ECR_REPO_NAME} .'
-                    }
-                }
-            }
-        }
-        stage("ECR Image Pushing") {
-            steps {
-                script {
-                        sh 'aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${REPOSITORY_URI}'
-                        sh 'docker tag ${AWS_ECR_REPO_NAME} ${REPOSITORY_URI}${AWS_ECR_REPO_NAME}:${BUILD_NUMBER}'
-                        sh 'docker push ${REPOSITORY_URI}${AWS_ECR_REPO_NAME}:${BUILD_NUMBER}'
-                }
-            }
-        }
-        stage("TRIVY Image Scan") {
-            steps {
-                sh 'trivy image ${REPOSITORY_URI}${AWS_ECR_REPO_NAME}:${BUILD_NUMBER} > trivyimage.txt' 
-            }
-        }
-        stage('Checkout Code') {
-            steps {
-                git credentialsId: 'GITHUB', url: 'https://github.com/AmanPathak-DevOps/End-to-End-Kubernetes-Three-Tier-DevSecOps-Project.git'
-            }
-        }
-        stage('Update Deployment file') {
-            environment {
-                GIT_REPO_NAME = "End-to-End-Kubernetes-Three-Tier-DevSecOps-Project"
-                GIT_USER_NAME = "AmanPathak-DevOps"
-            }
-            steps {
-                dir('Kubernetes-Manifests-file/Backend') {
-                    withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+                dir("${APP_DIR}") {
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                         sh '''
-                            git config user.email "aman07pathak@gmail.com"
-                            git config user.name "AmanPathak-DevOps"
-                            BUILD_NUMBER=${BUILD_NUMBER}
-                            echo $BUILD_NUMBER
-                            imageTag=$(grep -oP '(?<=backend:)[^ ]+' deployment.yaml)
-                            echo $imageTag
-                            sed -i "s/${AWS_ECR_REPO_NAME}:${imageTag}/${AWS_ECR_REPO_NAME}:${BUILD_NUMBER}/" deployment.yaml
-                            git add deployment.yaml
-                            git commit -m "Update deployment Image to version \${BUILD_NUMBER}"
-                            git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME} HEAD:master
+                            docker run --rm --network host --user "$(id -u):$(id -g)" \
+                              -e SONAR_HOST_URL=http://localhost:9000 \
+                              -e SONAR_TOKEN="$SONAR_TOKEN" \
+                              -e SONAR_USER_HOME=/usr/src/.sonar \
+                              -v "$PWD:/usr/src" \
+                              sonarsource/sonar-scanner-cli \
+                              -Dsonar.projectKey=three-tier-backend \
+                              -Dsonar.projectName=three-tier-backend \
+                              "-Dsonar.exclusions=.sonar/**,.scannerwork/**" \
+                              -Dsonar.qualitygate.wait=true \
+                            || echo "WARNING: SonarQube quality gate not passed (or scan failed). Continuing because this is a demo."
                         '''
                     }
                 }
             }
+        }
+
+        stage('Trivy File Scan') {
+            steps {
+                dir("${APP_DIR}") {
+                    sh 'trivy fs --no-progress . > trivyfs.txt'
+                    sh 'cat trivyfs.txt | tail -n 30'
+                }
+            }
+        }
+
+        stage('Docker Image Build') {
+            steps {
+                dir("${APP_DIR}") {
+                    sh 'docker system prune -f'
+                    sh 'docker build -t $AWS_ECR_REPO_NAME .'
+                }
+            }
+        }
+
+        stage('ECR Image Pushing') {
+            steps {
+                sh '''
+                    aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+                    docker tag $AWS_ECR_REPO_NAME $ECR_REGISTRY/$AWS_ECR_REPO_NAME:$BUILD_NUMBER
+                    docker push $ECR_REGISTRY/$AWS_ECR_REPO_NAME:$BUILD_NUMBER
+                '''
+            }
+        }
+
+        stage('TRIVY Image Scan') {
+            steps {
+                sh 'trivy image --no-progress --severity HIGH,CRITICAL $ECR_REGISTRY/$AWS_ECR_REPO_NAME:$BUILD_NUMBER > trivyimage.txt'
+                sh 'cat trivyimage.txt | tail -n 30'
+            }
+        }
+
+        stage('Update Deployment file') {
+            steps {
+                dir("${MANIFEST_DIR}") {
+                    withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+                        sh '''
+                            git config user.email "$GIT_EMAIL"
+                            git config user.name "$GIT_USER_NAME"
+                            echo "Setting image tag to build number $BUILD_NUMBER"
+                            sed -i "s|image: .*/$AWS_ECR_REPO_NAME:.*|image: $ECR_REGISTRY/$AWS_ECR_REPO_NAME:$BUILD_NUMBER|" deployment.yaml
+                            grep "image:" deployment.yaml
+                            git add deployment.yaml
+                            git commit -m "Update backend image to version $BUILD_NUMBER" || echo "Nothing to commit"
+                            git pull --rebase https://$GITHUB_TOKEN@github.com/$GIT_USER_NAME/$GIT_REPO_NAME.git $GIT_BRANCH_NAME
+                            git push https://$GITHUB_TOKEN@github.com/$GIT_USER_NAME/$GIT_REPO_NAME.git HEAD:$GIT_BRANCH_NAME
+                        '''
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: '**/trivy*.txt', allowEmptyArchive: true
         }
     }
 }

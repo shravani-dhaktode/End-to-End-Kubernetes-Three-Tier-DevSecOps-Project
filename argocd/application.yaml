@@ -1,0 +1,24 @@
+# ArgoCD watches your GitHub repo and deploys everything inside Kubernetes-Manifests-file/.
+# Every time Jenkins pushes a new image tag, ArgoCD updates the app automatically (within ~3 minutes).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: three-tier
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/shravani-dhaktode/End-to-End-Kubernetes-Three-Tier-DevSecOps-Project.git
+    targetRevision: master
+    path: Kubernetes-Manifests-file
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: three-tier
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

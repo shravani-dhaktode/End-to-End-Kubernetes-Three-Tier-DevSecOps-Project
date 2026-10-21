@@ -3,6 +3,9 @@ kind: Service
 metadata:
   name: api
   namespace: three-tier
+  annotations:
+    # Load balancer checks this path to know the backend is healthy
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
 spec: 
   ports:
   - port: 3500

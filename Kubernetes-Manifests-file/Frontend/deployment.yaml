@@ -21,14 +21,12 @@ spec:
       labels:
         role: frontend
     spec: 
-      imagePullSecrets:
-      - name: ecr-registry-secret
       containers:
       - name: frontend
-        image: 407622020962.dkr.ecr.us-east-1.amazonaws.com/frontend:3
+        image: 747456040606.dkr.ecr.us-east-1.amazonaws.com/frontend:latest
         imagePullPolicy: Always
         env:
           - name: REACT_APP_BACKEND_URL
-            value: "http://amanpathakdevops.study/api/tasks"
+            value: "/api/tasks"   # relative path: works with any load balancer address
         ports:
         - containerPort: 3000

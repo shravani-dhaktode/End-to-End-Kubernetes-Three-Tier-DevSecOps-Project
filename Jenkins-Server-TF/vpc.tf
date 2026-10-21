@@ -48,7 +48,7 @@ resource "aws_security_group" "security-group" {
 
   ingress = [
     for port in [22, 8080, 9000, 9090, 80] : {
-      description      = "TLS from VPC"
+      description      = "Open port ${port}"
       from_port        = port
       to_port          = port
       protocol         = "tcp"
@@ -56,7 +56,7 @@ resource "aws_security_group" "security-group" {
       self             = false
       prefix_list_ids  = []
       security_groups  = []
-      cidr_blocks      = ["0.0.0.0/0"]
+      cidr_blocks      = ["0.0.0.0/0"] # open to all (as you chose)
     }
   ]
 
