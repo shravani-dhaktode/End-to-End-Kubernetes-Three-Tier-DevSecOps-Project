@@ -17,10 +17,10 @@ else
   eksctl create cluster \
     --name "$CLUSTER" \
     --region "$REGION" \
-    --nodegroup-name spot-nodes \
+    --zones us-east-1a,us-east-1b \
+    --nodegroup-name app-nodes \
     --managed \
-    --spot \
-    --instance-types t3.medium,t3a.medium \
+    --instance-types c7i-flex.large \
     --nodes 2 --nodes-min 2 --nodes-max 3 \
     --with-oidc
 fi

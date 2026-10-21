@@ -1,8 +1,8 @@
 resource "aws_instance" "ec2" {
   ami = data.aws_ami.ami.image_id
-  # t3.large = 2 vCPU, 8 GB RAM (~$0.083/hour). Enough for Jenkins + SonarQube + Docker builds.
-  # (t3.medium with 4 GB usually crashes when SonarQube and a React build run together.)
-  instance_type          = "t3.large"
+  # m7i-flex.large = 2 vCPU, 8 GB RAM. Free-plan eligible (paid from your AWS credits).
+  # Enough for Jenkins + SonarQube + Docker builds.
+  instance_type          = "m7i-flex.large"
   key_name               = var.key-name
   subnet_id              = aws_subnet.public-subnet.id
   vpc_security_group_ids = [aws_security_group.security-group.id]

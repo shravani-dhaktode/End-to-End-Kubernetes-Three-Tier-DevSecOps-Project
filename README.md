@@ -43,17 +43,17 @@ By hand you only do these things: create a GitHub token, click through the Jenki
 
 ## Cost (read this first)
 
-This is **not free**. If you finish in about 2–3 hours and run the cleanup, it costs about **US $1–3**.
+If you finish in about 2–3 hours and run the cleanup, it costs about **US $1.50–3.50**. On the AWS **Free plan** this comes out of your free credits ($100+). The Free plan only allows certain server types, so this project uses `m7i-flex.large` and `c7i-flex.large`, which are both allowed.
 
 | Item | Approx. cost |
 |---|---|
 | EKS control plane | $0.10 / hour |
-| Jenkins server t3.large | $0.083 / hour |
-| 2 × t3.medium Spot worker nodes | ~$0.03 / hour |
+| Jenkins server m7i-flex.large (8 GB) | ~$0.10 / hour |
+| 2 × c7i-flex.large worker nodes (4 GB each) | ~$0.17 / hour |
 | NAT gateway (made by eksctl) | $0.045 / hour |
 | 2 load balancers (app + ArgoCD) | ~$0.05 / hour |
 
-> ⚠️ **If you forget Part 14 (cleanup), it keeps charging about $0.30/hour (about $220/month).**
+> ⚠️ **If you forget Part 14 (cleanup), it keeps charging about $0.45/hour (about $330/month) and eats your credits.**
 
 ### Your plan: practise now, show the examiner later
 
@@ -493,14 +493,14 @@ Open the printed app link and check you can add a task. ✅ You're ready.
 | Problem | Fix |
 |---|---|
 | `terraform apply`: *InvalidKeyPair.NotFound* | The key pair isn't in **us-east-1** or the name isn't `project`. Fix it in Part 1.4. |
-| `terraform apply`: error about account plan / not eligible | Upgrade the account plan (Part 1.5), then run `terraform apply` again. |
+| `terraform apply`: *not eligible for Free Tier* | Your account is on the Free plan. The instance type must be one of: t3.micro, t3.small, t4g.micro, t4g.small, c7i-flex.large, m7i-flex.large. This project already uses allowed types. |
 | Jenkins page doesn't open | Install isn't finished. Check `ls ~/SETUP_DONE`. |
 | SonarQube page doesn't open | Run `docker ps -a`. If `sonar` isn't running, run `docker start sonar` and wait 2 minutes. |
 | Pipeline fails at **Checkout** | Check the repo URL and that the branch is `master`. |
 | Pipeline fails at **ECR Image Pushing** | Make sure `terraform apply` finished (it creates the ECR repos). |
 | Pipeline fails at **Update Deployment file** with 403 | The GitHub token is wrong or doesn't have the `repo` scope. Edit the `github` credential. |
 | `got permission denied ... docker.sock` | On the server, run `sudo chmod 777 /var/run/docker.sock && sudo systemctl restart jenkins`. |
-| EKS script error: *Spot capacity* or *insufficient capacity* | Run `nohup bash scripts/1-create-eks.sh > ~/eks-setup.log 2>&1 &` again. It skips steps already done. |
+| EKS script error: *insufficient capacity* or *Unsupported* zone | Run `nohup bash scripts/1-create-eks.sh > ~/eks-setup.log 2>&1 &` again. It skips steps already done. |
 | Pods show `ImagePullBackOff` | Pipelines haven't run yet, or ArgoCD hasn't seen the new tag. Wait 3 minutes, or in ArgoCD click **Refresh**, then **Sync**. |
 | Pod `api` shows `0/1` | It waits for MongoDB and retries every 5 seconds. Give it about 1 minute. |
 | App link shows 503 | The load balancer is still registering pods. Wait 2–3 minutes. |
@@ -508,7 +508,7 @@ Open the printed app link and check you can add a task. ✅ You're ready.
 
 ## What was changed from the original project
 
-- Terraform uses local state, so you don't need an S3 bucket or DynamoDB table. It also creates the ECR repos, uses a t3.large on Ubuntu 24.04 with Java 21 (needed by current Jenkins), and prints outputs.
+- Terraform uses local state, so you don't need an S3 bucket or DynamoDB table. It also creates the ECR repos, uses a Free-plan-eligible m7i-flex.large on Ubuntu 24.04 with Java 21 (needed by current Jenkins), and prints outputs.
 - `tools-install.sh` uses the 2026 Jenkins signing key, the current SonarQube Community image, a pinned Trivy version, Node.js 20, and a 4 GB swap file.
 - The Jenkinsfiles need no extra plugins and only 2 credentials. SonarQube runs through Docker and can be switched off with the `RUN_SONAR` option. The slow OWASP Dependency-Check stage was removed.
 - Kubernetes:
