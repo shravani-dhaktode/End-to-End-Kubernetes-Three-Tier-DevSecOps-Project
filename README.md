@@ -55,6 +55,16 @@ This is **not free**. If you finish in about 2–3 hours and run the cleanup, it
 
 > ⚠️ **If you forget Part 14 (cleanup), it keeps charging about $0.30/hour (about $220/month).**
 
+### Your plan: practise now, show the examiner later
+
+| Phase | What you do | Time |
+|---|---|---|
+| **Today: practise** | Parts 1–13 (full setup, once) | ~2 hours |
+| **Today: pause** | Part 14A deletes the Kubernetes cluster and **stops** (doesn't delete) the Jenkins server | ~15 min |
+| **While paused** | Jenkins, SonarQube results, credentials, pipelines, images and GitHub history are **all kept** | ~US $2.50/month |
+| **Exam day: resume** | Part 15 starts the server, recreates the cluster and redeploys | ~40 min (start 1 hour before the exam) |
+| **After the exam** | Part 14B deletes everything for good | ~20 min |
+
 ---
 
 ## Timeline
@@ -100,7 +110,8 @@ Jenkins needs this token to push the new image version into your repo.
 
 1. Go to https://github.com/settings/tokens. You must be logged in as `shravani-dhaktode`.
 2. Click **Generate new token**, then **Generate new token (classic)**.
-3. Set Note to `jenkins`, Expiration to **7 days**, and tick the **`repo`** box.
+3. Set Note to `jenkins`. For **Expiration**, pick **Custom** and choose a date **a few days after your exam**. Then tick the **`repo`** box.
+   (If the token expires before the exam, the pipeline's last stage fails.)
 4. Click **Generate token**. **Copy the token (it starts with `ghp_`) into Notepad.** GitHub only shows it once.
 
 ---
@@ -232,7 +243,7 @@ You don't need any extra plugins. This version of the pipeline was simplified to
 1. Open **`http://<JENKINS-IP>:9000`**. If it says "starting", wait 1–2 minutes and refresh.
 2. Log in with **admin / admin**. It forces you to set a new password, so choose one and write it down.
 3. Click the **A** avatar (top right), then **My Account**, then the **Security** tab.
-4. Under **Generate Tokens**, set Name to `jenkins`, Type to **Global Analysis Token**, and Expires in to **30 days**. Click **Generate**.
+4. Under **Generate Tokens**, set Name to `jenkins`, Type to **Global Analysis Token**, and Expires in to **No expiration**. Click **Generate**.
 5. **Copy the token (starts with `sqa_`) into Notepad.**
 
 ---
@@ -368,20 +379,45 @@ Take your screenshots for your portfolio now, before cleanup.
 
 ---
 
-## PART 14: DELETE EVERYTHING (20 min). Don't skip this.
+## PART 14: Stop the charges
 
-**Order matters:** delete the cluster first (from the Jenkins server), then the Jenkins server (from CloudShell).
+You have two choices:
+- **14A Pause:** use this after practising. You can bring everything back on exam day.
+- **14B Delete forever:** use this after the exam.
 
-### 14.1 On the Jenkins server (Instance Connect)
+### 14A Pause (keep Jenkins for exam day)
+
+**Step 1: On the Jenkins server (Instance Connect), delete the Kubernetes cluster.** This is the expensive part (~$0.25/hour).
 
 ```bash
 cd ~/End-to-End-Kubernetes-Three-Tier-DevSecOps-Project
 bash scripts/3-cleanup.sh
 ```
 
-This takes about 10–15 minutes and ends with "Cluster deleted".
+Wait until it says **Cluster deleted** (10–15 min).
 
-### 14.2 In CloudShell
+**Step 2: Stop the Jenkins server (don't terminate it).**
+AWS console → **EC2 → Instances** → tick **Jenkins-server** → **Instance state → Stop instance**.
+> ⚠️ Click **Stop**, NOT **Terminate**. Terminate deletes Jenkins and all your setup.
+
+**Step 3: Check that nothing expensive is left** (us-east-1):
+
+| Page | Should be |
+|---|---|
+| EKS → Clusters | empty |
+| EC2 → Load Balancers | empty |
+| VPC → NAT gateways | **Deleted** |
+| CloudFormation → Stacks | no `eksctl-...` stacks |
+| EC2 → Instances | Jenkins-server = **Stopped** |
+
+While paused you only pay for the server's 30 GB disk and the stored images, about **US $2.50/month**.
+
+> Don't delete the project folder in CloudShell. It holds the Terraform state file needed for 14B. (CloudShell keeps your files unless you don't open it for 120 days.)
+
+### 14B Delete forever (after the exam)
+
+1. Do **14A Step 1** (`bash scripts/3-cleanup.sh`) if the cluster is running. The Jenkins server must be **running** to do this.
+2. In CloudShell:
 
 ```bash
 export PATH=$HOME/bin:$PATH
@@ -391,9 +427,9 @@ terraform init
 terraform destroy -var-file=variables.tfvars -auto-approve
 ```
 
-It ends with `Destroy complete!`.
+It ends with `Destroy complete!`. If CloudShell says `terraform: command not found`, repeat the Terraform install lines from Part 4.
 
-### 14.3 Double-check in the AWS console (us-east-1)
+3. Check the AWS console (us-east-1):
 
 | Page | Should be |
 |---|---|
@@ -405,11 +441,50 @@ It ends with `Destroy complete!`.
 | CloudFormation → Stacks | no `eksctl-...` stacks |
 | ECR → Repositories | empty |
 
-If anything is left, select it and delete it by hand.
+4. Delete the GitHub token at https://github.com/settings/tokens.
 
-### 14.4 GitHub
+---
 
-Delete the token at https://github.com/settings/tokens.
+## PART 15: Exam day (resume in ~40 minutes)
+
+**Start about 1 hour before the examiner arrives.** Creating the cluster takes ~25 minutes, and you don't want them watching that.
+
+**15.1 Start the Jenkins server.** EC2 → Instances → tick **Jenkins-server** → **Instance state → Start instance**. Wait until it shows **Running** with **2/2 checks passed** (~2 min).
+
+**15.2 Note the NEW public IP.** The IP **changes** every time you stop and start the server. Copy the new **Public IPv4 address**. Jenkins is now `http://<NEW-IP>:8080` and SonarQube is `http://<NEW-IP>:9000`.
+
+**15.3 Connect and recreate the cluster.** Click **Connect → EC2 Instance Connect → Connect**, then run:
+
+```bash
+cd ~/End-to-End-Kubernetes-Three-Tier-DevSecOps-Project
+git pull
+nohup bash scripts/1-create-eks.sh > ~/eks-setup.log 2>&1 &
+```
+
+**15.4 While you wait (~25 min),** open Jenkins and SonarQube in the browser and log in. Everything is still there. If SonarQube doesn't open, run `docker start sonar` on the server and wait 2 minutes.
+
+**15.5 When `tail -n 8 ~/eks-setup.log` shows ALL DONE,** copy the **new** ArgoCD URL and password (they change each time). Then run:
+
+```bash
+git pull
+bash scripts/2-deploy-app.sh
+```
+
+Open the printed app link and check you can add a task. ✅ You're ready.
+
+### What to show the examiner (suggested order, ~15 min)
+
+1. **GitHub repo:** the code, the Terraform folder (infrastructure as code), the Jenkinsfiles and the Kubernetes manifests.
+2. **Jenkins:** run **three-tier-backend → Build with Parameters**. Tick **RUN_SONAR** to show the code scan live (adds ~3 min), or untick it to save time. Walk through the stages as they turn green: SonarQube → Trivy scan → Docker build → push to ECR → update GitHub.
+3. **SonarQube:** the project's code-quality results.
+4. **Trivy reports:** in the Jenkins build → **Build Artifacts**.
+5. **AWS ECR:** the image versions.
+6. **GitHub:** the new commit from Jenkins with the image tag changed.
+7. **ArgoCD:** the app syncing the new version automatically (GitOps). Click **Refresh** to speed it up.
+8. **Terminal:** `kubectl get pods -n three-tier` and `kubectl get ingress -n three-tier`.
+9. **The live app** in the browser: add, complete and delete a task.
+
+**After the exam**, do **Part 14B** (delete forever), or **14A** again if you need it once more.
 
 ---
 

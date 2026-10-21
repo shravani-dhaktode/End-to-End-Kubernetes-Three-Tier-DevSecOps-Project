@@ -1,6 +1,6 @@
 #!/bin/bash
 # STEP: delete the Kubernetes cluster and its load balancers so AWS stops charging.
-# Run on the Jenkins server BEFORE you run "terraform destroy" in CloudShell.
+# Run on the Jenkins server. Use it to PAUSE (then stop the EC2 instance) or before "terraform destroy".
 #     bash scripts/3-cleanup.sh
 # Takes about 10-15 minutes.
 set -uo pipefail
@@ -29,4 +29,6 @@ echo "Deleting the Load Balancer Controller IAM policy..."
 aws iam delete-policy --policy-arn "arn:aws:iam::$ACCOUNT_ID:policy/AWSLoadBalancerControllerIAMPolicy" || true
 
 echo ""
-echo "Cluster deleted. Now go to AWS CloudShell and run: terraform destroy -var-file=variables.tfvars -auto-approve"
+echo "Cluster deleted."
+echo " - Pausing for exam day? Now STOP (not terminate) the Jenkins-server instance in the EC2 console."
+echo " - Deleting forever? Now run 'terraform destroy' in CloudShell (README Part 14B)."
